@@ -274,7 +274,7 @@
   </div>
 
 <script>
-const API = (location.protocol === 'file:' || !location.port) ? 'http://localhost:8000' : location.origin;
+const API = 'https://api.butterbase.ai/v1/app_f5m0095c1kkt/fn';
 
 const AGENTS = [
   { id: 'finance',   name: 'Finance',   icon: '💰' },
@@ -425,9 +425,9 @@ async function decide(decision) {
   document.getElementById('btnApprove').disabled = true;
   document.getElementById('btnReview').disabled = true;
   try {
-    await fetch(`${API}/events/${currentEventId}/decision`, {
+    await fetch(`${API}/events`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision })
+      body: JSON.stringify({ event_id: currentEventId, decision })
     });
   } catch (e) { console.error(e); }
   loadHistory();
@@ -435,37 +435,60 @@ async function decide(decision) {
 document.getElementById('btnApprove').onclick = () => decide('approve');
 document.getElementById('btnReview').onclick = () => decide('review');
 
-/* ---------- SSE ---------- */
-function connectSSE() {
-  const es = new EventSource(`${API}/events/live`);
-  es.onmessage = (e) => {
-    let msg; try { msg = JSON.parse(e.data); } catch { return; }
-    if (msg.kind === 'event_received') {
-      upsertFeedItem({ ...msg, status: 'processing' });
-      resetAgents(msg.agents || []);
-    } else if (msg.kind === 'event_complete') {
-      const outs = msg.agent_outputs || {};
-      AGENTS.forEach(a => { if (outs[a.id]) completeAgent(a.id, outs[a.id]); });
-      upsertFeedItem({ ...msg, status: 'complete' });
-      showDecision(msg);
-      loadHistory(); loadMemory();
-    } else if (msg.kind === 'event_decision') {
-      const ev = seenEvents.get(msg.event_id);
-      if (ev) upsertFeedItem({ ...ev, status: msg.status });
-      loadHistory();
-    }
+/* ---------- Trigger result handling (no SSE -- the /trigger response carries everything) ---------- */
+function handleTriggerResult(payload, result) {
+  if (result.error) { console.error('trigger error', result.error); return; }
+  const ev = {
+    event_id: result.event_id,
+    type: (result.classification && result.classification.event_type) || payload.type,
+    source: payload.source,
+    content: payload.content,
+    status: 'processed',
+    summary: result.summary,
+    alert_message: result.alert_message,
+    timestamp: new Date().toISOString(),
   };
-  es.onerror = () => { es.close(); setTimeout(connectSSE, 3000); };
+  const activeAgents = (result.classification && result.classification.agents) || [];
+  resetAgents(activeAgents);
+  const outs = result.agent_outputs || {};
+  AGENTS.forEach(a => { if (outs[a.id]) completeAgent(a.id, outs[a.id]); });
+  upsertFeedItem(ev);
+  showDecision(ev);
+  loadHistory(); loadMemory();
 }
 
-/* ---------- Polling loaders ---------- */
-async function loadConfig() {
+/* ---------- Polling (replaces SSE: catches events created via the Photon webhook) ---------- */
+async function pollEvents() {
   try {
-    const c = await (await fetch(`${API}/config`)).json();
-    document.getElementById('watchEmail').textContent = '📧 watching: ' + (c.email_user || 'not configured');
-    document.getElementById('watchImsg').textContent = '💬 iMessage: ' + (c.imessage_number || 'not configured');
+    const events = await (await fetch(`${API}/events`)).json();
+    if (!Array.isArray(events)) return;
+    const unseen = events.filter(e => !seenEvents.has(e.id)).reverse();
+    for (const e of unseen) {
+      const ev = {
+        event_id: e.id, type: e.type, source: e.source, content: e.content,
+        status: e.status, summary: e.summary, timestamp: e.created_at,
+      };
+      upsertFeedItem(ev);
+      const agentIds = (e.agents_triggered || '').split(',').filter(Boolean);
+      if (agentIds.length) {
+        resetAgents(agentIds);
+        agentIds.forEach(id => completeAgent(id, { reasoning: e.summary }));
+        showDecision(ev);
+      }
+    }
+    if (unseen.length) { loadHistory(); loadMemory(); }
+  } catch (e) { /* ignore transient polling errors */ }
+}
+async function seedSeenEvents() {
+  try {
+    const events = await (await fetch(`${API}/events`)).json();
+    if (Array.isArray(events)) {
+      events.forEach(e => seenEvents.set(e.id, { event_id: e.id, type: e.type, source: e.source, content: e.content, status: e.status, summary: e.summary, timestamp: e.created_at }));
+    }
   } catch {}
 }
+
+/* ---------- Loaders ---------- */
 async function loadHealth() {
   try {
     const h = await (await fetch(`${API}/health`)).json();
@@ -473,6 +496,8 @@ async function loadHealth() {
     setDot('butterbase', s.butterbase === 'connected');
     setDot('evermind', s.evermind === 'connected');
     setDot('photon', (s.photon || '').includes('config'));
+    document.getElementById('watchEmail').textContent = '⚙️ env: ' + (h.env || 'production');
+    document.getElementById('watchImsg').textContent = '💬 iMessage: ' + (h.imessage_number || 'not configured');
   } catch {
     ['butterbase','evermind','photon'].forEach(k => setDot(k, false));
   }
@@ -501,7 +526,7 @@ async function loadHistory() {
 }
 async function loadMemory() {
   try {
-    const data = await (await fetch(`${API}/agents/memory/supervisor`)).json();
+    const data = await (await fetch(`${API}/memory?agent_id=supervisor`)).json();
     const bank = document.getElementById('memoryBank');
     let items = [];
     if (Array.isArray(data)) items = data;
@@ -538,18 +563,28 @@ document.querySelectorAll('.scenario').forEach(btn => {
   btn.onclick = async () => {
     document.getElementById('overlay').classList.remove('open');
     const payload = DEMOS[btn.dataset.demo];
+    resetAgents(['finance','hr','logistics','support']);
+    const fab = document.getElementById('demoFab');
+    const prevText = fab.textContent;
+    fab.textContent = '⏳ Processing…'; fab.disabled = true;
     try {
-      await fetch(`${API}/trigger`, {
+      const resp = await fetch(`${API}/trigger`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
-    } catch (e) { console.error(e); }
+      const result = await resp.json();
+      handleTriggerResult(payload, result);
+    } catch (e) { console.error(e); alert('Trigger failed: ' + e); }
+    fab.textContent = prevText; fab.disabled = false;
   };
 });
 
 /* ---------- Boot ---------- */
 buildAgents();
-loadConfig(); loadHealth(); loadHistory(); loadMemory();
-connectSSE();
+loadHealth(); loadHistory(); loadMemory();
+seedSeenEvents().then(() => {
+  pollEvents();
+  setInterval(pollEvents, 8000);
+});
 setInterval(loadHistory, 10000);
 setInterval(loadHealth, 15000);
 setInterval(() => { // refresh "time ago" labels
