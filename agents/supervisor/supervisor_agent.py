@@ -12,6 +12,7 @@ from agents.support.support_agent import SupportAgent
 from integrations.butterbase import client
 from integrations.evermind import memory
 from integrations.photon import imessage
+from memory.shared_brain import log_collaboration
 
 AGENT_REGISTRY = {
     "finance": FinanceAgent(),
@@ -106,6 +107,7 @@ class SupervisorAgent:
         )
 
         memory.flush_session(event_id)
+        log_collaboration(event_id, agent_names, summary)
 
         return {
             "event_id": event_id,
