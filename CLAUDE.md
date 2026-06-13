@@ -4,8 +4,8 @@ FleetMind is a multi-agent orchestrator for fleet/operations management. A
 **supervisor** agent receives incoming requests and routes them to one of
 four domain agents — **finance**, **hr**, **logistics**, and **support** —
 each of which can read/write shared data in **Butterbase**, recall and store
-long-term memory via **EverOS**, and trigger **Photon** iMessage alerts for
-events that need a human's attention.
+long-term memory via **EverMind Cloud**, and trigger **Photon** iMessage
+alerts for events that need a human's attention.
 
 This file is the persistent context for Claude Code sessions working on this
 repo. Keep it up to date as the architecture solidifies.
@@ -38,7 +38,7 @@ repo. Keep it up to date as the architecture solidifies.
         ┌─────────────────────────────────────────────┐
         │              integrations/                    │
         │  butterbase/  -> DB + RAG knowledge store      │
-        │  evermind/    -> EverOS persistent memory      │
+        │  evermind/    -> EverMind Cloud agent memory   │
         │  photon/      -> iMessage alerts (outbound)    │
         └─────────────────────────────────────────────┘
                               │
@@ -66,33 +66,35 @@ repo. Keep it up to date as the architecture solidifies.
   reimbursement status.
 - Queries Butterbase tables for financial records and uses Butterbase RAG
   for policy documents (expense policy, approval thresholds, etc.).
-- Uses `agents/finance/memory_config.py` to configure its EverOS memory
-  namespace (what gets remembered: past approvals, recurring vendors,
-  user-specific spending patterns).
+- Recalls and stores its case history via `integrations/evermind/memory.py`
+  (EverMind Cloud, `user_id="finance"`) — past approvals, recurring vendors,
+  and contract-impact assessments.
 
 ### HR (`agents/hr/hr_agent.py`)
 - Handles employee records, leave/PTO requests, onboarding/offboarding
   questions, and policy lookups (handbook, benefits).
 - Queries Butterbase for employee data and RAG over HR policy docs.
-- `agents/hr/memory_config.py` configures EverOS memory for this agent
-  (e.g., remembering an employee's leave history or open HR tickets).
+- Recalls and stores its case history via `integrations/evermind/memory.py`
+  (EverMind Cloud, `user_id="hr"`) — e.g., an employee's leave history or
+  open HR tickets.
 
 ### Logistics (`agents/logistics/logistics_agent.py`)
 - Handles fleet/vehicle status, routes, deliveries, maintenance schedules,
   and driver assignments.
 - Queries Butterbase for live fleet/vehicle/route data and RAG over
   operations manuals (maintenance SOPs, routing guidelines).
-- `agents/logistics/memory_config.py` configures EverOS memory for this
-  agent (e.g., remembering recurring route issues or a vehicle's maintenance
-  history).
+- Recalls and stores its case history via `integrations/evermind/memory.py`
+  (EverMind Cloud, `user_id="logistics"`) — e.g., recurring route issues or
+  a vehicle's maintenance history.
 
 ### Support (`agents/support/support_agent.py`)
 - Handles general support tickets and questions that don't cleanly belong
   to finance/hr/logistics — first line of triage, FAQ answers, and
   escalation to a human.
 - Queries Butterbase RAG over general knowledge base / FAQ content.
-- `agents/support/memory_config.py` configures EverOS memory for this agent
-  (e.g., remembering a user's open tickets and prior interactions).
+- Recalls and stores its case history via `integrations/evermind/memory.py`
+  (EverMind Cloud, `user_id="support"`) — e.g., a customer's open tickets
+  and prior interactions.
 
 ## Integrations
 
@@ -106,21 +108,34 @@ repo. Keep it up to date as the architecture solidifies.
   answering a question (retrieval-augmented generation).
 - Auth: `BUTTERBASE_URL`, `BUTTERBASE_API_KEY`, `BUTTERBASE_PROJECT_ID`.
 
-### EverOS (`integrations/evermind/`)
-- `memory.py` — client for EverOS persistent agent memory. Each agent
-  (supervisor + 4 domain agents) has its own memory namespace, configured
-  via that agent's `memory_config.py`. Used to store/retrieve long-term
-  facts, summaries, and conversation history across sessions so agents
-  don't start from a blank slate every run.
-- `skills.py` — reusable EverOS "skills" (tool definitions/behaviors) that
-  agents can register and invoke — shared building blocks across agents
-  (e.g., a "lookup employee" skill usable by both HR and Finance).
-- EverOS uses its own LLM and embedding model configuration, independent of
-  the main Anthropic model used by the agents:
-  - `EVEROS_LLM__API_KEY`, `EVEROS_LLM__MODEL`, `EVEROS_LLM__BASE_URL` —
-    model EverOS uses internally for memory summarization/reasoning.
-  - `EVEROS_EMBEDDING__API_KEY`, `EVEROS_EMBEDDING__MODEL` — model EverOS
-    uses to embed memories for retrieval.
+### EverMind Cloud (`integrations/evermind/`)
+- `memory.py` — client for EverMind Cloud's hosted agent-memory API
+  (`https://api.evermind.ai`). Each of the 4 domain agents has its own
+  memory stream, addressed by `user_id=<agent_id>` (`finance`, `hr`,
+  `logistics`, `support`). Exposes:
+  - `store_memory(agent_id, session_id, content)` — record what an agent
+    did/found for an event, via `POST /api/v1/memories/agent`.
+  - `search_memory(agent_id, query)` — hybrid retrieval of an agent's past
+    episodes/cases relevant to the current task, via
+    `POST /api/v1/memories/search`.
+  - `flush_session(session_id)` — force EverMind to extract/consolidate
+    memories for a finished orchestration run, across all 4 agents, via
+    `POST /api/v1/memories/agent/flush`.
+  - `get_agent_skills(agent_id)` — fetch the self-evolving "skills" EverMind
+    has distilled from an agent's past cases, via
+    `POST /api/v1/memories/get` (`memory_type="agent_skill"`).
+  - All calls degrade gracefully (return an empty/error result instead of
+    raising) so a memory outage never breaks an agent run.
+- Auth: `EVERMIND_API_KEY` (Bearer token), `EVERMIND_BASE_URL`
+  (`https://api.evermind.ai`). Note: `https://everos.evermind.ai` is the
+  EverMind *dashboard* (where API keys are issued), not the API host.
+- The supervisor calls `memory.flush_session(event_id)` at the end of
+  `run()`, after all dispatched agents have stored their findings for that
+  event.
+- Separately, the `EVEROS_LLM__*` / `EVEROS_EMBEDDING__*` / `EVEROS_RERANK__*`
+  / `EVEROS_MULTIMODAL__*` env vars configure models on the **Butterbase AI
+  gateway** used by `integrations/butterbase/client.py` for chat completions
+  — unrelated to EverMind Cloud memory.
 
 ### Photon (`integrations/photon/`)
 - `imessage.py` — sends outbound iMessage alerts via Photon when an agent
@@ -157,8 +172,10 @@ repo. Keep it up to date as the architecture solidifies.
 | `EVEROS_LLM__API_KEY` | API key for EverOS's internal LLM (memory summarization). |
 | `EVEROS_LLM__MODEL` | Model name EverOS uses for memory operations. |
 | `EVEROS_LLM__BASE_URL` | Base URL for EverOS's LLM provider. |
-| `EVEROS_EMBEDDING__API_KEY` | API key for EverOS's embedding model. |
-| `EVEROS_EMBEDDING__MODEL` | Embedding model name used for memory retrieval. |
+| `EVEROS_EMBEDDING__API_KEY` | API key for the Butterbase AI gateway embedding model. |
+| `EVEROS_EMBEDDING__MODEL` | Embedding model name (Butterbase AI gateway). |
+| `EVERMIND_API_KEY` | API key for EverMind Cloud agent memory. |
+| `EVERMIND_BASE_URL` | Base URL for the EverMind Cloud API (`https://api.evermind.ai`). |
 | `PHOTON_API_KEY` | API key for sending Photon iMessage alerts. |
 | `PHOTON_WEBHOOK_SECRET` | Secret used to verify inbound Photon webhooks. |
 | `ALERT_IMESSAGE_NUMBER` | Destination iMessage handle/number for alerts. |
@@ -188,12 +205,11 @@ repo. Keep it up to date as the architecture solidifies.
    python tests/demo.py
    ```
    The demo script exercises the supervisor → domain agent → Butterbase /
-   EverOS / Photon flow end-to-end without needing the API server running.
+   EverMind / Photon flow end-to-end without needing the API server running.
 
 ## Conventions for future work
-- Keep agent-specific EverOS configuration in each agent's
-  `memory_config.py` — don't hardcode memory namespaces inline in agent
-  logic.
+- All agent memory access goes through `integrations/evermind/memory.py` —
+  agents should not call the EverMind Cloud API directly.
 - All Butterbase access goes through `integrations/butterbase/client.py`
   and `rag.py` — agents should not call Butterbase APIs directly.
 - All outbound alerts go through `integrations/photon/imessage.py` — keep

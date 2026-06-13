@@ -62,13 +62,21 @@ def test_butterbase_ai_gateway():
         print(f"❌ AI gateway failed: {e}")
 
 
-def test_everos():
+def test_evermind():
+    base_url = os.environ.get("EVERMIND_BASE_URL", "https://api.evermind.ai").rstrip("/")
+    api_key = os.environ.get("EVERMIND_API_KEY", "")
+
     try:
-        resp = httpx.get("http://127.0.0.1:8000/health", timeout=3)
+        resp = httpx.post(
+            f"{base_url}/api/v1/memories/search",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"query": "connection test", "filters": {"user_id": "fleetmind-verify"}, "top_k": 1},
+            timeout=15,
+        )
         resp.raise_for_status()
-        print("✅ EverOS running")
-    except Exception:
-        print("❌ EverOS not running - run: everos server start")
+        print("✅ EverMind Cloud connected")
+    except Exception as e:
+        print(f"❌ EverMind Cloud failed: {e}")
 
 
 def test_butterbase_embeddings():
@@ -117,6 +125,6 @@ def test_photon():
 if __name__ == "__main__":
     test_butterbase()
     test_butterbase_ai_gateway()
-    test_everos()
+    test_evermind()
     test_butterbase_embeddings()
     test_photon()
