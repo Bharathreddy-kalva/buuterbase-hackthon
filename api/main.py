@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from agents.supervisor.supervisor_agent import SupervisorAgent
@@ -13,6 +14,12 @@ from integrations.evermind import memory
 from integrations.photon import imessage
 
 app = FastAPI(title="FleetMind")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(webhook_router)
 
 supervisor = SupervisorAgent()
