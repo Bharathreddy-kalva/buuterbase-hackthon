@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from integrations.butterbase import client
+from memory import event_bus
 
 load_dotenv()
 
@@ -77,6 +78,13 @@ async def photon_webhook(request: Request):
         )
         if latest:
             client.update("events", latest[0]["id"], {"status": action})
+            event_bus.publish(
+                {
+                    "kind": "event_decision",
+                    "event_id": latest[0]["id"],
+                    "status": action,
+                }
+            )
             return {"received": True, "event": event_type, "event_id": latest[0]["id"], "action": action}
         return {"received": True, "event": event_type, "action": action}
 

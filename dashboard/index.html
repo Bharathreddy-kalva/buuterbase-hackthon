@@ -1,753 +1,563 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FleetMind — Multi-Agent Operations Orchestrator</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>⚡ FleetMind — Autonomous Operations Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
-  * { font-family: 'Inter', system-ui, sans-serif; }
-
+  :root {
+    --orange: #f97316;
+    --orange-soft: rgba(249, 115, 22, 0.15);
+    --blue: #3b82f6;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --glass: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text: #f5f5f7;
+    --muted: #9ca3af;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
+    font-family: 'Inter', system-ui, sans-serif;
     background: linear-gradient(135deg, #0f0a1a 0%, #1a0505 50%, #1a1000 100%);
     background-attachment: fixed;
+    color: var(--text);
     min-height: 100vh;
-    color: #f3f4f6;
+    padding: 20px;
   }
-
-  /* Ambient glow blobs */
-  .blob {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(120px);
-    opacity: .22;
-    pointer-events: none;
-  }
-  .blob-1 { width: 520px; height: 520px; background: #f97316; top: -180px; left: -160px; }
-  .blob-2 { width: 600px; height: 600px; background: #7c3aed; bottom: -260px; right: -200px; }
-  .blob-3 { width: 420px; height: 420px; background: #ef4444; top: 40%; left: 50%; opacity: .12; }
-
-  /* Glass cards */
-  .glass {
-    background: rgba(255,255,255,0.05);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.08);
+  .card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
     border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 18px;
   }
-  .glow-orange {
-    border-color: rgba(249,115,22,0.35);
-    box-shadow: 0 0 30px rgba(249,115,22,0.12);
+  .section-title {
+    font-size: 14px; font-weight: 700; letter-spacing: .02em;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .muted { color: var(--muted); }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .brand { display: flex; flex-direction: column; }
+  .brand h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+  .brand h1 .bolt { color: var(--orange); }
+  .brand .subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .clock { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .watching { display: flex; gap: 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; justify-content: flex-end; }
+  .pills { display: flex; gap: 8px; }
+  .pill {
+    font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 50px;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .dot.pulse { animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+  /* ---------- Top grid ---------- */
+  .top-grid {
+    display: grid; grid-template-columns: 35fr 40fr 25fr; gap: 18px; margin-bottom: 18px;
+  }
+  .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 1100px) {
+    .top-grid { grid-template-columns: 1fr; }
+    .bottom-grid { grid-template-columns: 1fr; }
   }
 
-  /* Status pills (header) */
-  .status-pill {
-    display: flex; align-items: center; gap: .5rem;
-    background: rgba(255,255,255,.05);
-    border: 1px solid rgba(255,255,255,.08);
-    border-radius: 999px;
-    padding: .4rem 1rem;
-    font-size: .8rem;
-    backdrop-filter: blur(8px);
-    transition: box-shadow .3s;
+  /* ---------- Live feed ---------- */
+  .feed-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-left: auto; font-weight: 500; }
+  #liveFeed { display: flex; flex-direction: column; gap: 10px; max-height: 460px; overflow-y: auto; }
+  .feed-item {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);
+    border-radius: 12px; padding: 12px; cursor: pointer; transition: border-color .2s, transform .2s;
+    animation: slideIn .4s ease;
   }
-  .status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #6b7280;
-    box-shadow: 0 0 6px #6b7280;
-    transition: all .3s;
+  .feed-item:hover { border-color: var(--orange); }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+  .feed-head { display: flex; align-items: center; gap: 8px; }
+  .feed-icon { font-size: 16px; }
+  .feed-source { font-weight: 600; font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-time { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .feed-preview { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  .badge {
+    font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 50px; text-transform: uppercase; letter-spacing: .03em;
   }
+  .badge.processing { background: rgba(249,115,22,.18); color: var(--orange); }
+  .badge.complete, .badge.processed { background: rgba(34,197,94,.18); color: var(--green); }
+  .badge.approved { background: rgba(59,130,246,.2); color: var(--blue); }
+  .badge.needs_review { background: rgba(234,179,8,.2); color: var(--yellow); }
 
-  /* Trigger type pills */
-  .trigger-pill {
-    display: inline-flex; align-items: center; gap: .5rem;
-    border: 1px solid rgba(255,255,255,.1);
-    background: rgba(255,255,255,.03);
-    border-radius: 999px;
-    padding: .55rem 1.25rem;
-    font-size: .85rem;
-    font-weight: 500;
-    color: #d1d5db;
-    cursor: pointer;
-    transition: all .2s ease;
+  /* ---------- Agent grid ---------- */
+  .agent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .agent {
+    border-radius: 14px; padding: 16px; border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.03); transition: box-shadow .3s, border-color .3s; min-height: 150px;
+    display: flex; flex-direction: column;
   }
-  .trigger-pill:hover { border-color: rgba(249,115,22,.4); color: #fff; }
-  .trigger-pill.active {
-    border-color: #f97316;
-    background: rgba(249,115,22,.15);
-    color: #fb923c;
-    box-shadow: 0 0 18px rgba(249,115,22,.35);
+  .agent.finance.active { border-color: var(--blue); box-shadow: 0 0 24px rgba(59,130,246,.35); }
+  .agent.hr.active { border-color: var(--green); box-shadow: 0 0 24px rgba(34,197,94,.35); }
+  .agent.logistics.active { border-color: var(--yellow); box-shadow: 0 0 24px rgba(234,179,8,.35); }
+  .agent.support.active { border-color: var(--red); box-shadow: 0 0 24px rgba(239,68,68,.35); }
+  .agent-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .agent-name { font-weight: 700; font-size: 14px; flex: 1; }
+  .agent-status {
+    font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 3px 9px; border-radius: 50px;
+    background: rgba(255,255,255,0.07); color: var(--muted);
   }
+  .agent-status.analyzing { color: var(--orange); }
+  .agent-status.analyzing::before { content: '◌ '; animation: spin 1s linear infinite; display: inline-block; }
+  .agent-status.complete { color: var(--green); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .agent-finding { font-size: 12px; color: var(--text); line-height: 1.45; flex: 1; opacity: .92; }
+  .agent-finding.empty { color: var(--muted); font-style: italic; }
+  .conf-wrap { margin-top: 10px; }
+  .conf-label { font-size: 10px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .conf-bar { height: 6px; border-radius: 50px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .conf-fill { height: 100%; width: 0; border-radius: 50px; transition: width .8s ease; }
+  .agent.finance .conf-fill { background: var(--blue); box-shadow: 0 0 10px var(--blue); }
+  .agent.hr .conf-fill { background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .agent.logistics .conf-fill { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
+  .agent.support .conf-fill { background: var(--red); box-shadow: 0 0 10px var(--red); }
 
-  /* Inputs */
-  .event-textarea, .event-input {
-    background: rgba(0,0,0,.3);
-    border: 1px solid rgba(255,255,255,.1);
-    border-radius: 12px;
-    padding: .8rem 1rem;
-    color: #f3f4f6;
-    font-size: .9rem;
-    outline: none;
-    resize: vertical;
-    transition: border-color .2s, box-shadow .2s;
+  /* ---------- Decision center ---------- */
+  .exec-box {
+    border: 1px solid var(--orange); border-radius: 14px; padding: 14px;
+    background: var(--orange-soft); font-size: 13px; line-height: 1.5; margin-bottom: 16px; min-height: 70px;
   }
-  .event-textarea:focus, .event-input:focus {
-    border-color: #f97316;
-    box-shadow: 0 0 0 3px rgba(249,115,22,.15);
+  .exec-box.empty { color: var(--muted); font-style: italic; border-color: var(--glass-border); background: rgba(255,255,255,0.03); }
+  .phone {
+    background: #000; border-radius: 22px; padding: 14px 12px 18px; border: 2px solid #2a2a2a; margin-bottom: 14px;
   }
-  .event-textarea::placeholder, .event-input::placeholder { color: #6b7280; }
+  .phone-notch { width: 40%; height: 5px; background: #2a2a2a; border-radius: 50px; margin: 0 auto 12px; }
+  .imsg-bubble {
+    background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; padding: 11px 14px;
+    border-radius: 18px 18px 18px 4px; font-size: 12.5px; line-height: 1.45; max-width: 92%; white-space: pre-wrap; word-wrap: break-word;
+  }
+  .imsg-meta { font-size: 10px; color: var(--muted); margin-top: 6px; text-align: center; }
+  .decision-btns { display: flex; gap: 10px; }
+  .btn {
+    flex: 1; border: none; border-radius: 50px; padding: 12px; font-family: inherit; font-weight: 700; font-size: 13px;
+    cursor: pointer; transition: transform .15s, box-shadow .2s; color: #fff;
+  }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn:not(:disabled):hover { transform: translateY(-2px); }
+  .btn.approve { background: var(--green); box-shadow: 0 0 18px rgba(34,197,94,.5); }
+  .btn.review { background: var(--orange); box-shadow: 0 0 18px rgba(249,115,22,.5); }
 
-  /* Primary button */
-  .btn-primary {
-    background: linear-gradient(135deg, #fb923c, #f97316, #ea580c);
-    color: #fff;
-    font-weight: 600;
-    border: none;
-    border-radius: 50px;
-    padding: .9rem 2.2rem;
-    font-size: .95rem;
-    cursor: pointer;
-    display: inline-flex; align-items: center; gap: .6rem;
-    box-shadow: 0 0 20px rgba(249,115,22,.35);
-    transition: transform .25s ease, box-shadow .25s ease;
-    white-space: nowrap;
-  }
-  .btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    animation: pulse-glow 1.6s ease-in-out infinite;
-  }
-  .btn-primary:disabled { opacity: .55; cursor: not-allowed; transform: none; animation: none; }
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 22px rgba(249,115,22,.5), 0 0 45px rgba(249,115,22,.25); }
-    50% { box-shadow: 0 0 32px rgba(249,115,22,.85), 0 0 65px rgba(249,115,22,.45); }
-  }
+  /* ---------- Memory + history ---------- */
+  #memoryBank { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; }
+  .mem-item { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px; }
+  .mem-head { display: flex; gap: 8px; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .mem-content { font-size: 12px; line-height: 1.4; opacity: .9; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--glass-border); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+  .history-wrap { max-height: 320px; overflow-y: auto; }
+  .summary-cell { color: var(--muted); max-width: 280px; }
 
-  /* Agent cards */
-  .agent-card {
-    position: relative;
-    overflow: hidden;
-    transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+  /* ---------- Demo button + overlay ---------- */
+  .demo-fab {
+    position: fixed; bottom: 20px; right: 20px; z-index: 50;
+    background: var(--glass); border: 1px solid var(--glass-border); color: var(--muted);
+    padding: 8px 14px; border-radius: 50px; font-family: inherit; font-size: 12px; cursor: pointer; backdrop-filter: blur(8px);
   }
-  .agent-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,.45); }
-  .agent-top-border { height: 3px; width: 100%; }
-  .agent-icon {
-    width: 38px; height: 38px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; flex-shrink: 0;
+  .demo-fab:hover { color: var(--text); border-color: var(--orange); }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 60; }
+  .overlay.open { display: flex; }
+  .overlay-card { width: 360px; max-width: 90vw; }
+  .scenario {
+    width: 100%; text-align: left; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
+    border-radius: 12px; padding: 13px; margin-bottom: 10px; color: var(--text); font-family: inherit; font-size: 13px; cursor: pointer;
   }
-  .card-running { box-shadow: 0 0 0 1px rgba(249,115,22,.35), 0 0 30px rgba(249,115,22,.1); }
+  .scenario:hover { border-color: var(--orange); }
+  .scenario small { color: var(--muted); display: block; margin-top: 3px; font-size: 11px; }
+  .overlay-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; float: right; }
 
-  /* Status badges */
-  .status-badge {
-    font-size: .65rem; font-weight: 700;
-    padding: .25rem .65rem; border-radius: 999px;
-    text-transform: uppercase; letter-spacing: .04em;
-    white-space: nowrap;
-  }
-  .status-idle { background: rgba(255,255,255,.08); color: rgba(255,255,255,.45); }
-  .status-running { background: rgba(249,115,22,.15); color: #fb923c; box-shadow: 0 0 10px rgba(249,115,22,.3); }
-  .status-complete { background: rgba(34,197,94,.15); color: #4ade80; }
-  .status-error { background: rgba(239,68,68,.15); color: #f87171; }
-
-  /* Typing dots */
-  .typing-dots span {
-    display: inline-block;
-    animation: blink 1.4s infinite both;
-    font-weight: 700;
-  }
-  .typing-dots span:nth-child(2) { animation-delay: .2s; }
-  .typing-dots span:nth-child(3) { animation-delay: .4s; }
-  @keyframes blink { 0%, 80%, 100% { opacity: .15; } 40% { opacity: 1; } }
-
-  /* Confidence bar */
-  .confidence-track {
-    height: 6px; border-radius: 3px;
-    background: rgba(255,255,255,.08);
-    overflow: hidden;
-  }
-  .confidence-fill {
-    height: 100%; border-radius: 3px;
-    width: 0%;
-    transition: width 1s ease;
-  }
-
-  /* Chips */
-  .chip {
-    display: inline-block;
-    font-size: .68rem; font-weight: 500;
-    padding: .15rem .55rem;
-    border: 1px solid;
-    border-radius: 6px;
-    margin: 2px;
-    white-space: nowrap;
-  }
-
-  /* iMessage preview */
-  .imessage-screen {
-    background: #000;
-    border-radius: 18px;
-    padding: 1.5rem;
-    min-height: 170px;
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-end;
-  }
-  .imessage-bubble {
-    background: linear-gradient(135deg, #34d058, #25b347);
-    color: #fff;
-    padding: .75rem 1.05rem;
-    border-radius: 18px 18px 4px 18px;
-    font-size: .82rem;
-    line-height: 1.55;
-    max-width: 90%;
-    white-space: pre-line;
-    box-shadow: 0 4px 16px rgba(0,0,0,.35);
-  }
-
-  /* History table */
-  .history-table { font-size: .85rem; }
-  .history-table th {
-    text-align: left; font-size: .65rem; text-transform: uppercase; letter-spacing: .06em;
-    color: rgba(255,255,255,.4); padding: .65rem .9rem; border-bottom: 1px solid rgba(255,255,255,.08);
-    white-space: nowrap;
-  }
-  .history-table td { padding: .7rem .9rem; border-bottom: 1px solid rgba(255,255,255,.05); vertical-align: top; }
-  .history-table tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
-  .history-table tbody tr:hover { background: rgba(249,115,22,.06); }
-
-  /* Memory bank */
-  .memory-card {
-    background: rgba(255,255,255,.03);
-    border: 1px solid rgba(255,255,255,.06);
-    border-left: 3px solid;
-    border-radius: 10px;
-    padding: .65rem .85rem;
-  }
-
-  /* Fade in */
-  .fade-in { animation: fadeIn .6s ease forwards; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(249,115,22,.3); border-radius: 4px; }
+  ::-webkit-scrollbar { width: 7px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 50px; }
 </style>
 </head>
-<body class="min-h-screen overflow-x-hidden">
+<body>
+  <header>
+    <div class="brand">
+      <h1><span class="bolt">⚡</span> FleetMind</h1>
+      <span class="subtitle">Autonomous Operations Intelligence</span>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="watching">
+        <span id="watchEmail">📧 watching: —</span>
+        <span id="watchImsg">💬 iMessage: —</span>
+      </div>
+      <div class="pills" id="stackPills">
+        <span class="pill"><span class="dot red" id="dot-butterbase"></span> Butterbase</span>
+        <span class="pill"><span class="dot red" id="dot-evermind"></span> EverMind</span>
+        <span class="pill"><span class="dot red" id="dot-photon"></span> Photon</span>
+      </div>
+    </div>
+  </header>
 
-  <div class="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
+  <div class="top-grid">
+    <!-- LIVE FEED -->
+    <div class="card">
+      <div class="section-title">
+        📡 Live Incoming Events
+        <span class="feed-status"><span class="dot green pulse"></span> Watching…</span>
+      </div>
+      <div id="liveFeed"><div class="muted" style="font-size:12px">No events yet. FleetMind is watching the inbox and iMessage.</div></div>
+    </div>
+
+    <!-- AGENT ACTIVITY -->
+    <div class="card">
+      <div class="section-title">🤖 Agent Intelligence</div>
+      <div class="agent-grid" id="agentGrid">
+        <!-- agent cards injected by JS -->
+      </div>
+    </div>
+
+    <!-- DECISION CENTER -->
+    <div class="card">
+      <div class="section-title">🎯 Decision Center</div>
+      <div class="exec-box empty" id="execSummary">Executive summary will appear here once an event is processed.</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="imsg-bubble" id="imsgBubble">FleetMind alerts to the CFO will preview here.</div>
+        <div class="imsg-meta">Reply APPROVE or REVIEW</div>
+      </div>
+      <div class="decision-btns">
+        <button class="btn approve" id="btnApprove" disabled>✓ APPROVE</button>
+        <button class="btn review" id="btnReview" disabled>⟳ REVIEW</button>
+      </div>
+    </div>
   </div>
 
-  <div class="relative max-w-7xl mx-auto px-5 md:px-8 py-8">
+  <div class="bottom-grid">
+    <!-- MEMORY BANK -->
+    <div class="card">
+      <div class="section-title">🧠 EverMind Memory</div>
+      <div id="memoryBank"><div class="muted" style="font-size:12px">No memories loaded yet.</div></div>
+    </div>
 
-    <!-- Header -->
-    <header class="flex flex-wrap items-center justify-between gap-4 mb-8">
-      <div>
-        <h1 class="text-3xl md:text-4xl font-extrabold text-white flex items-center gap-2">
-          <span style="color:#f97316; text-shadow:0 0 20px rgba(249,115,22,.6);">⚡</span> FleetMind
-        </h1>
-        <p class="text-gray-400 text-sm mt-1">Multi-Agent Operations Orchestrator</p>
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <div class="status-pill" id="status-butterbase"><span class="status-dot"></span> Butterbase</div>
-        <div class="status-pill" id="status-evermind"><span class="status-dot"></span> EverMind</div>
-        <div class="status-pill" id="status-photon"><span class="status-dot"></span> Photon</div>
-      </div>
-    </header>
-
-    <!-- Trigger Panel -->
-    <section class="glass p-6 mb-8">
-      <div class="flex flex-wrap gap-3 mb-5" id="trigger-pills">
-        <button class="trigger-pill active" data-type="email"><i class="fa-solid fa-envelope"></i> Email</button>
-        <button class="trigger-pill" data-type="imessage"><i class="fa-solid fa-comment-dots"></i> iMessage</button>
-        <button class="trigger-pill" data-type="webhook"><i class="fa-solid fa-bell"></i> Webhook</button>
-        <button class="trigger-pill" data-type="document"><i class="fa-solid fa-file-lines"></i> Document</button>
-      </div>
-
-      <textarea id="event-content" rows="4" class="event-textarea w-full mb-4">Our primary logistics vendor just announced a 25% rate increase effective next month. All existing contracts will need to be renegotiated.</textarea>
-
-      <div class="flex flex-wrap gap-4 items-end">
-        <div class="flex-1 min-w-[220px]">
-          <label class="text-xs text-gray-400 uppercase tracking-wide mb-1.5 block">Source</label>
-          <input id="event-source" type="text" class="event-input w-full" placeholder="e.g. ops@fleetmind.io" value="ops@fleetmind.io">
-        </div>
-        <button id="trigger-btn" class="btn-primary" onclick="triggerFleetMind()">
-          <i class="fa-solid fa-bolt"></i> Trigger FleetMind
-        </button>
-      </div>
-    </section>
-
-    <!-- Agent Cards -->
-    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-
-      <div class="glass agent-card" id="card-finance">
-        <div class="agent-top-border" style="background:#3b82f6"></div>
-        <div class="p-5">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="agent-icon" style="background:rgba(59,130,246,.15); color:#3b82f6"><i class="fa-solid fa-coins"></i></div>
-              <div>
-                <h3 class="font-semibold text-white text-sm">Finance</h3>
-                <p class="text-[11px] text-gray-500">Budgets & Contracts</p>
-              </div>
-            </div>
-            <span class="status-badge status-idle">Idle</span>
-          </div>
-          <div class="agent-body min-h-[90px]">
-            <p class="text-sm text-gray-500 italic">Waiting for trigger...</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="glass agent-card" id="card-hr">
-        <div class="agent-top-border" style="background:#22c55e"></div>
-        <div class="p-5">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="agent-icon" style="background:rgba(34,197,94,.15); color:#22c55e"><i class="fa-solid fa-users"></i></div>
-              <div>
-                <h3 class="font-semibold text-white text-sm">HR</h3>
-                <p class="text-[11px] text-gray-500">Staff & Policies</p>
-              </div>
-            </div>
-            <span class="status-badge status-idle">Idle</span>
-          </div>
-          <div class="agent-body min-h-[90px]">
-            <p class="text-sm text-gray-500 italic">Waiting for trigger...</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="glass agent-card" id="card-logistics">
-        <div class="agent-top-border" style="background:#eab308"></div>
-        <div class="p-5">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="agent-icon" style="background:rgba(234,179,8,.15); color:#eab308"><i class="fa-solid fa-truck"></i></div>
-              <div>
-                <h3 class="font-semibold text-white text-sm">Logistics</h3>
-                <p class="text-[11px] text-gray-500">Fleet & Shipments</p>
-              </div>
-            </div>
-            <span class="status-badge status-idle">Idle</span>
-          </div>
-          <div class="agent-body min-h-[90px]">
-            <p class="text-sm text-gray-500 italic">Waiting for trigger...</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="glass agent-card" id="card-support">
-        <div class="agent-top-border" style="background:#ef4444"></div>
-        <div class="p-5">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="agent-icon" style="background:rgba(239,68,68,.15); color:#ef4444"><i class="fa-solid fa-headset"></i></div>
-              <div>
-                <h3 class="font-semibold text-white text-sm">Support</h3>
-                <p class="text-[11px] text-gray-500">Customers & Tickets</p>
-              </div>
-            </div>
-            <span class="status-badge status-idle">Idle</span>
-          </div>
-          <div class="agent-body min-h-[90px]">
-            <p class="text-sm text-gray-500 italic">Waiting for trigger...</p>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- Results Panel -->
-    <section id="results-panel" class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8 hidden">
-      <div class="glass glow-orange p-6">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="font-semibold text-white flex items-center gap-2">
-            <i class="fa-solid fa-file-pen" style="color:#f97316"></i> Executive Summary
-          </h3>
-          <span class="text-xs font-mono text-gray-500" id="event-id-badge"></span>
-        </div>
-        <p id="exec-summary" class="text-sm text-gray-300 leading-relaxed whitespace-pre-line"></p>
-      </div>
-      <div class="glass p-6">
-        <h3 class="font-semibold text-white flex items-center gap-2 mb-4">
-          <i class="fa-solid fa-comment-sms" style="color:#34d058"></i> iMessage Alert Preview
-        </h3>
-        <div class="imessage-screen">
-          <div class="imessage-bubble" id="imessage-bubble"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Event History + Memory Bank -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      <div class="glass p-6 lg:col-span-2 overflow-x-auto">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-semibold text-white flex items-center gap-2">
-            <i class="fa-solid fa-clock-rotate-left" style="color:#f97316"></i> Event History
-          </h3>
-          <button onclick="loadEvents()" class="text-xs text-gray-400 hover:text-orange-400 transition flex items-center gap-1.5">
-            <i class="fa-solid fa-rotate"></i> Refresh
-          </button>
-        </div>
-        <table class="history-table w-full">
-          <thead>
-            <tr>
-              <th>Event ID</th><th>Type</th><th>Source</th><th>Summary</th><th>Agents</th><th>Status</th><th>Created</th>
-            </tr>
-          </thead>
-          <tbody id="events-tbody">
-            <tr><td colspan="7" class="text-center text-gray-500 py-8">Loading events...</td></tr>
-          </tbody>
+    <!-- EVENT HISTORY -->
+    <div class="card">
+      <div class="section-title">📜 Event History</div>
+      <div class="history-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Type</th><th>Source</th><th>Agents</th><th>Status</th><th>Summary</th></tr></thead>
+          <tbody id="historyBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
         </table>
       </div>
-
-      <div class="glass p-6">
-        <h3 class="font-semibold text-white flex items-center gap-2 mb-4">
-          <i class="fa-solid fa-brain" style="color:#a855f7"></i> Memory Bank
-        </h3>
-        <div id="memory-bank" class="space-y-3 max-h-[440px] overflow-y-auto pr-1">
-          <p class="text-sm text-gray-500 italic">Loading memories...</p>
-        </div>
-      </div>
-    </section>
-
-    <footer class="text-center text-xs text-gray-600 mt-10 pb-4">
-      FleetMind &middot; Supervisor &rarr; Finance / HR / Logistics / Support &middot; Butterbase + EverMind Cloud + Photon
-    </footer>
+    </div>
   </div>
 
-  <div id="toast" class="fixed bottom-6 right-6 glass px-4 py-3 text-sm text-red-300 max-w-sm hidden z-50" style="border-color: rgba(239,68,68,.35);"></div>
+  <button class="demo-fab" id="demoFab">🎭 Demo</button>
+  <div class="overlay" id="overlay">
+    <div class="card overlay-card">
+      <button class="overlay-close" id="overlayClose">✕ close</button>
+      <div class="section-title">🎭 Demo Scenarios</div>
+      <button class="scenario" data-demo="vendor">📧 Vendor Rate Increase<small>Simulates an email from a vendor raising rates 15%</small></button>
+      <button class="scenario" data-demo="warehouse">💬 Warehouse Emergency<small>Simulates an urgent iMessage about a facility outage</small></button>
+      <button class="scenario" data-demo="contract">🔔 Contract Expiry<small>Simulates a system alert that a key contract is expiring</small></button>
+    </div>
+  </div>
 
 <script>
-  const API_BASE = 'http://localhost:8000';
+const API = (location.protocol === 'file:' || !location.port) ? 'http://localhost:8000' : location.origin;
 
-  const AGENT_META = {
-    finance:   { color: '#3b82f6', label: 'Finance',   icon: 'fa-coins' },
-    hr:        { color: '#22c55e', label: 'HR',        icon: 'fa-users' },
-    logistics: { color: '#eab308', label: 'Logistics', icon: 'fa-truck' },
-    support:   { color: '#ef4444', label: 'Support',   icon: 'fa-headset' },
-  };
+const AGENTS = [
+  { id: 'finance',   name: 'Finance',   icon: '💰' },
+  { id: 'hr',        name: 'HR',        icon: '👥' },
+  { id: 'logistics', name: 'Logistics', icon: '🚚' },
+  { id: 'support',   name: 'Support',   icon: '📞' },
+];
 
-  let selectedTriggerType = 'email';
+let currentEventId = null;
 
-  function escapeHtml(str) {
-    return String(str ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    }[c]));
-  }
+/* ---------- Clock ---------- */
+function tickClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+setInterval(tickClock, 1000); tickClock();
 
-  function chip(text, color) {
-    return `<span class="chip" style="border-color:${color}66; color:${color}">${escapeHtml(text)}</span>`;
-  }
+/* ---------- Helpers ---------- */
+function timeAgo(ts) {
+  if (!ts) return 'just now';
+  const then = new Date(ts).getTime();
+  const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (s < 60) return s + ' second' + (s === 1 ? '' : 's') + ' ago';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + ' minute' + (m === 1 ? '' : 's') + ' ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' hour' + (h === 1 ? '' : 's') + ' ago';
+  return Math.floor(h / 24) + ' day(s) ago';
+}
+function iconFor(type, source) {
+  const t = (type || '') + ' ' + (source || '');
+  if (/email/i.test(t)) return '📧';
+  if (/imessage|sms|photon|message/i.test(t)) return '💬';
+  return '🔔';
+}
+function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
-  function formatDate(value) {
-    if (!value) return '—';
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return String(value);
-    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  }
-
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i>${escapeHtml(msg)}`;
-    t.classList.remove('hidden');
-    clearTimeout(window._toastTimer);
-    window._toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
-  }
-
-  // ---------- Trigger pills ----------
-  document.querySelectorAll('.trigger-pill').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.trigger-pill').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selectedTriggerType = btn.dataset.type;
-    });
-  });
-
-  // ---------- Health check ----------
-  async function checkHealth() {
-    try {
-      const res = await fetch(`${API_BASE}/health`);
-      const data = await res.json();
-      const stacks = data.stacks || {};
-      updateStatusPill('butterbase', stacks.butterbase === 'connected');
-      updateStatusPill('evermind', stacks.evermind === 'connected');
-      updateStatusPill('photon', stacks.photon === 'configured');
-    } catch (e) {
-      ['butterbase', 'evermind', 'photon'].forEach(s => updateStatusPill(s, false));
-    }
-  }
-
-  function updateStatusPill(name, ok) {
-    const el = document.getElementById(`status-${name}`);
-    if (!el) return;
-    const dot = el.querySelector('.status-dot');
-    const color = ok ? '#22c55e' : '#ef4444';
-    dot.style.background = color;
-    dot.style.boxShadow = `0 0 8px ${color}`;
-  }
-
-  // ---------- Agent card state ----------
-  function setCardState(id, state, output) {
-    const card = document.getElementById(`card-${id}`);
-    if (!card) return;
-    const badge = card.querySelector('.status-badge');
-    const body = card.querySelector('.agent-body');
-
-    card.classList.remove('card-running');
-
-    if (state === 'idle') {
-      badge.textContent = 'Idle';
-      badge.className = 'status-badge status-idle';
-      body.innerHTML = `<p class="text-sm text-gray-500 italic">Waiting for trigger...</p>`;
-    } else if (state === 'running') {
-      badge.textContent = 'Running';
-      badge.className = 'status-badge status-running';
-      card.classList.add('card-running');
-      body.innerHTML = `<div class="flex items-center gap-1.5 text-sm text-gray-400">
-          <span>Analyzing</span>
-          <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
-        </div>`;
-    } else if (state === 'complete') {
-      badge.textContent = 'Complete';
-      badge.className = 'status-badge status-complete';
-      body.innerHTML = renderAgentResult(id, output);
-    } else if (state === 'skipped') {
-      badge.textContent = 'Not needed';
-      badge.className = 'status-badge status-idle';
-      body.innerHTML = `<p class="text-sm text-gray-500 italic">Supervisor determined this agent wasn't needed for this event.</p>`;
-    } else if (state === 'error') {
-      badge.textContent = 'Error';
-      badge.className = 'status-badge status-error';
-      body.innerHTML = `<p class="text-sm text-red-400">Failed to reach FleetMind API.</p>`;
-    }
-  }
-
-  function renderAgentResult(id, output) {
-    const meta = AGENT_META[id];
-    let metricHtml = '';
-    let chipsHtml = '';
-
-    if (id === 'finance') {
-      const amount = Number(output.impact_amount || 0);
-      metricHtml = `<div class="text-2xl font-bold" style="color:${meta.color}">$${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                     <div class="text-[11px] text-gray-500 uppercase tracking-wide">Estimated impact</div>`;
-      chipsHtml = (output.affected_contracts || []).map(c => chip(c, meta.color)).join('')
-        || `<span class="text-xs text-gray-500">No contracts affected</span>`;
-    } else if (id === 'hr') {
-      const staff = output.affected_staff || [];
-      metricHtml = `<div class="text-2xl font-bold" style="color:${meta.color}">${staff.length}</div>
-                     <div class="text-[11px] text-gray-500 uppercase tracking-wide">Staff to loop in</div>`;
-      chipsHtml = staff.map(c => chip(c, meta.color)).join('')
-        || `<span class="text-xs text-gray-500">No staff identified</span>`;
-    } else if (id === 'logistics') {
-      const shipments = output.affected_shipments || [];
-      metricHtml = `<div class="text-2xl font-bold" style="color:${meta.color}">${output.rerouted_count ?? 0}</div>
-                     <div class="text-[11px] text-gray-500 uppercase tracking-wide">Shipments rerouted</div>`;
-      chipsHtml = shipments.map(c => chip(c, meta.color)).join('')
-        || `<span class="text-xs text-gray-500">No shipments affected</span>`;
-    } else if (id === 'support') {
-      const clients = output.affected_clients || [];
-      metricHtml = `<div class="text-2xl font-bold" style="color:${meta.color}">${clients.length}</div>
-                     <div class="text-[11px] text-gray-500 uppercase tracking-wide">Clients affected</div>`;
-      chipsHtml = clients.map(c => chip(c, meta.color)).join('')
-        || `<span class="text-xs text-gray-500">No clients affected</span>`;
-    }
-
-    const actionText = output.action || output.recommended_action || '';
-
-    let confidenceHtml = '';
-    if (typeof output.confidence === 'number') {
-      const pct = Math.round(output.confidence * 100);
-      confidenceHtml = `
-        <div class="mt-3">
-          <div class="flex justify-between text-[11px] text-gray-400 mb-1">
-            <span>Confidence</span><span>${pct}%</span>
-          </div>
-          <div class="confidence-track">
-            <div class="confidence-fill" style="background:${meta.color}; box-shadow:0 0 8px ${meta.color}" data-target="${pct}"></div>
-          </div>
-        </div>`;
-    }
-
-    return `
-      <div class="fade-in">
-        ${metricHtml}
-        <div class="mt-2 flex flex-wrap gap-1">${chipsHtml}</div>
-        ${confidenceHtml}
-        <p class="text-xs text-gray-300 mt-3 leading-relaxed max-h-28 overflow-y-auto pr-1">${escapeHtml(actionText)}</p>
+/* ---------- Agent cards ---------- */
+function buildAgents() {
+  const grid = document.getElementById('agentGrid');
+  grid.innerHTML = AGENTS.map(a => `
+    <div class="agent ${a.id}" id="agent-${a.id}">
+      <div class="agent-head">
+        <span style="font-size:18px">${a.icon}</span>
+        <span class="agent-name">${a.name}</span>
+        <span class="agent-status" id="status-${a.id}">IDLE</span>
       </div>
-    `;
+      <div class="agent-finding empty" id="finding-${a.id}">Awaiting event…</div>
+      <div class="conf-wrap" id="conf-${a.id}" style="display:none">
+        <div class="conf-label"><span>confidence</span><span id="confval-${a.id}">0%</span></div>
+        <div class="conf-bar"><div class="conf-fill" id="conffill-${a.id}"></div></div>
+      </div>
+    </div>`).join('');
+}
+function resetAgents(activeIds) {
+  AGENTS.forEach(a => {
+    const card = document.getElementById('agent-' + a.id);
+    const status = document.getElementById('status-' + a.id);
+    const finding = document.getElementById('finding-' + a.id);
+    document.getElementById('conf-' + a.id).style.display = 'none';
+    if (activeIds.includes(a.id)) {
+      card.classList.add('active');
+      status.className = 'agent-status analyzing'; status.textContent = 'ANALYZING';
+      finding.className = 'agent-finding empty'; finding.textContent = 'Querying data, recalling memory, reasoning…';
+    } else {
+      card.classList.remove('active');
+      status.className = 'agent-status'; status.textContent = 'IDLE';
+      finding.className = 'agent-finding empty'; finding.textContent = 'Not engaged for this event';
+    }
+  });
+}
+function keyFinding(id, out) {
+  if (!out) return 'No finding';
+  if (id === 'finance') {
+    const amt = Number(out.impact_amount || 0);
+    const money = amt ? '$' + amt.toLocaleString() + ' impact. ' : '';
+    return money + (out.recommended_action || out.reasoning || '');
   }
+  if (id === 'hr') {
+    const n = (out.affected_staff || []).length;
+    return (n ? n + ' staff to loop in. ' : '') + (out.action || out.reasoning || '');
+  }
+  if (id === 'logistics') {
+    const n = (out.affected_shipments || []).length;
+    return (n ? n + ' operations affected. ' : '') + (out.action || out.reasoning || '');
+  }
+  if (id === 'support') {
+    const n = (out.affected_clients || []).length;
+    return (n ? n + ' customers affected. ' : '') + (out.action || out.reasoning || '');
+  }
+  return out.reasoning || JSON.stringify(out).slice(0, 140);
+}
+function completeAgent(id, out) {
+  const status = document.getElementById('status-' + id);
+  const finding = document.getElementById('finding-' + id);
+  if (!status) return;
+  status.className = 'agent-status complete'; status.textContent = 'COMPLETE';
+  finding.className = 'agent-finding'; finding.textContent = keyFinding(id, out);
+  // Confidence: finance gives explicit, others get a sensible default.
+  let conf = (out && typeof out.confidence === 'number') ? out.confidence : 0.85;
+  conf = Math.max(0, Math.min(1, conf));
+  document.getElementById('conf-' + id).style.display = 'block';
+  document.getElementById('confval-' + id).textContent = Math.round(conf * 100) + '%';
+  setTimeout(() => { document.getElementById('conffill-' + id).style.width = (conf * 100) + '%'; }, 60);
+}
 
-  function animateConfidenceBars(card) {
-    card.querySelectorAll('.confidence-fill[data-target]').forEach(el => {
-      const target = el.dataset.target;
-      requestAnimationFrame(() => { el.style.width = `${target}%`; });
+/* ---------- Live feed ---------- */
+const seenEvents = new Map();
+function upsertFeedItem(ev) {
+  const feed = document.getElementById('liveFeed');
+  const placeholder = feed.querySelector('.muted');
+  if (placeholder) feed.innerHTML = '';
+  let el = document.getElementById('feed-' + ev.event_id);
+  const statusClass = (ev.status || 'processing').toLowerCase();
+  const content = ev.content || (seenEvents.get(ev.event_id) || {}).content || '';
+  const html = `
+    <div class="feed-head">
+      <span class="feed-icon">${iconFor(ev.type, ev.source)}</span>
+      <span class="feed-source">${esc(ev.source || ev.type || 'event')}</span>
+      <span class="badge ${statusClass}">${esc(ev.status || 'processing')}</span>
+    </div>
+    <div class="feed-preview">${esc(content.slice(0, 100))}${content.length > 100 ? '…' : ''}</div>
+    <div class="feed-time">${timeAgo(ev.timestamp)}</div>`;
+  const merged = { ...(seenEvents.get(ev.event_id) || {}), ...ev, content };
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'feed-item'; el.id = 'feed-' + ev.event_id;
+    el.onclick = () => alert((merged.content || '') + '\n\n— ' + (merged.summary || 'processing…'));
+    el.innerHTML = html;
+    feed.prepend(el);
+  } else {
+    el.innerHTML = html;
+    el.onclick = () => alert((merged.content || '') + '\n\n— ' + (merged.summary || 'processing…'));
+  }
+  seenEvents.set(ev.event_id, merged);
+}
+
+/* ---------- Decision center ---------- */
+function showDecision(ev) {
+  currentEventId = ev.event_id;
+  const exec = document.getElementById('execSummary');
+  exec.className = 'exec-box'; exec.textContent = ev.summary || '—';
+  document.getElementById('imsgBubble').textContent = ev.alert_message || ev.summary || '';
+  document.getElementById('btnApprove').disabled = false;
+  document.getElementById('btnReview').disabled = false;
+}
+async function decide(decision) {
+  if (!currentEventId) return;
+  document.getElementById('btnApprove').disabled = true;
+  document.getElementById('btnReview').disabled = true;
+  try {
+    await fetch(`${API}/events/${currentEventId}/decision`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision })
     });
+  } catch (e) { console.error(e); }
+  loadHistory();
+}
+document.getElementById('btnApprove').onclick = () => decide('approve');
+document.getElementById('btnReview').onclick = () => decide('review');
+
+/* ---------- SSE ---------- */
+function connectSSE() {
+  const es = new EventSource(`${API}/events/live`);
+  es.onmessage = (e) => {
+    let msg; try { msg = JSON.parse(e.data); } catch { return; }
+    if (msg.kind === 'event_received') {
+      upsertFeedItem({ ...msg, status: 'processing' });
+      resetAgents(msg.agents || []);
+    } else if (msg.kind === 'event_complete') {
+      const outs = msg.agent_outputs || {};
+      AGENTS.forEach(a => { if (outs[a.id]) completeAgent(a.id, outs[a.id]); });
+      upsertFeedItem({ ...msg, status: 'complete' });
+      showDecision(msg);
+      loadHistory(); loadMemory();
+    } else if (msg.kind === 'event_decision') {
+      const ev = seenEvents.get(msg.event_id);
+      if (ev) upsertFeedItem({ ...ev, status: msg.status });
+      loadHistory();
+    }
+  };
+  es.onerror = () => { es.close(); setTimeout(connectSSE, 3000); };
+}
+
+/* ---------- Polling loaders ---------- */
+async function loadConfig() {
+  try {
+    const c = await (await fetch(`${API}/config`)).json();
+    document.getElementById('watchEmail').textContent = '📧 watching: ' + (c.email_user || 'not configured');
+    document.getElementById('watchImsg').textContent = '💬 iMessage: ' + (c.imessage_number || 'not configured');
+  } catch {}
+}
+async function loadHealth() {
+  try {
+    const h = await (await fetch(`${API}/health`)).json();
+    const s = h.stacks || {};
+    setDot('butterbase', s.butterbase === 'connected');
+    setDot('evermind', s.evermind === 'connected');
+    setDot('photon', (s.photon || '').includes('config'));
+  } catch {
+    ['butterbase','evermind','photon'].forEach(k => setDot(k, false));
   }
+}
+function setDot(k, ok) {
+  const d = document.getElementById('dot-' + k);
+  if (d) d.className = 'dot ' + (ok ? 'green' : 'red');
+}
+async function loadHistory() {
+  try {
+    const events = await (await fetch(`${API}/events`)).json();
+    const body = document.getElementById('historyBody');
+    if (!Array.isArray(events) || !events.length) { body.innerHTML = '<tr><td colspan="6" class="muted">No events yet.</td></tr>'; return; }
+    body.innerHTML = events.map(e => {
+      const st = (e.status || '').toLowerCase();
+      return `<tr>
+        <td>${timeAgo(e.created_at)}</td>
+        <td>${esc(e.type)}</td>
+        <td>${esc(e.source)}</td>
+        <td>${esc(e.agents_triggered || '')}</td>
+        <td><span class="badge ${st}">${esc(e.status || '')}</span></td>
+        <td class="summary-cell">${esc((e.summary || '').slice(0, 110))}${(e.summary||'').length>110?'…':''}</td>
+      </tr>`;
+    }).join('');
+  } catch {}
+}
+async function loadMemory() {
+  try {
+    const data = await (await fetch(`${API}/agents/memory/supervisor`)).json();
+    const bank = document.getElementById('memoryBank');
+    let items = [];
+    if (Array.isArray(data)) items = data;
+    else if (data && Array.isArray(data.results)) items = data.results;
+    else if (data && Array.isArray(data.memories)) items = data.memories;
+    if (!items.length) { bank.innerHTML = '<div class="muted" style="font-size:12px">Memories accumulate here as agents learn from each event.</div>'; return; }
+    bank.innerHTML = items.slice(0, 5).map(m => {
+      const content = m.content || m.memory || m.text || JSON.stringify(m);
+      const ts = m.created_at || m.timestamp || '';
+      return `<div class="mem-item"><div class="mem-head">🧠 <span>${ts ? timeAgo(ts) : 'stored'}</span></div><div class="mem-content">${esc(String(content).slice(0,160))}</div></div>`;
+    }).join('');
+  } catch {}
+}
 
-  // ---------- Trigger ----------
-  async function triggerFleetMind() {
-    const btn = document.getElementById('trigger-btn');
-    const content = document.getElementById('event-content').value.trim();
-    const source = document.getElementById('event-source').value.trim() || selectedTriggerType;
-    if (!content) return;
-
-    btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Running agents...`;
-
-    document.getElementById('results-panel').classList.add('hidden');
-    Object.keys(AGENT_META).forEach(id => setCardState(id, 'running'));
-
+/* ---------- Demo mode ---------- */
+const DEMOS = {
+  vendor: {
+    type: 'email', source: 'billing@apex-supplies.com',
+    content: 'Rate Increase Notice\nEffective the 1st of next month, Apex Supplies is increasing all unit rates by 15% across your active agreements, citing higher input costs. No action is required to continue service at the new rates.'
+  },
+  warehouse: {
+    type: 'imessage', source: '+16282688640',
+    content: 'URGENT: Power outage at the East distribution hub — backup generator is down and refrigerated stock is at risk. Crews on site, need a call on rerouting today\'s outbound and notifying affected customers.'
+  },
+  contract: {
+    type: 'webhook', source: 'system-alert',
+    content: 'Contract CON-004 with your primary carrier expires in 14 days with no renewal on file. Auto-renewal is disabled. Operations depend on this carrier for 40% of outbound volume.'
+  }
+};
+document.getElementById('demoFab').onclick = () => document.getElementById('overlay').classList.add('open');
+document.getElementById('overlayClose').onclick = () => document.getElementById('overlay').classList.remove('open');
+document.getElementById('overlay').onclick = (e) => { if (e.target.id === 'overlay') e.target.classList.remove('open'); };
+document.querySelectorAll('.scenario').forEach(btn => {
+  btn.onclick = async () => {
+    document.getElementById('overlay').classList.remove('open');
+    const payload = DEMOS[btn.dataset.demo];
     try {
-      const res = await fetch(`${API_BASE}/trigger`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: selectedTriggerType, source, content }),
+      await fetch(`${API}/trigger`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      await revealResults(data);
-      loadEvents();
-      loadMemories();
-    } catch (e) {
-      Object.keys(AGENT_META).forEach(id => setCardState(id, 'error'));
-      showToast(`Couldn't reach FleetMind API at ${API_BASE} — is the server running? (${e.message})`);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = `<i class="fa-solid fa-bolt"></i> Trigger FleetMind`;
-    }
-  }
+    } catch (e) { console.error(e); }
+  };
+});
 
-  async function revealResults(data) {
-    const agentIds = Object.keys(AGENT_META);
-    for (const id of agentIds) {
-      await new Promise(r => setTimeout(r, 450));
-      const output = data.agent_outputs ? data.agent_outputs[id] : undefined;
-      if (output) {
-        setCardState(id, 'complete', output);
-        animateConfidenceBars(document.getElementById(`card-${id}`));
-      } else {
-        setCardState(id, 'skipped');
-      }
-    }
-
-    document.getElementById('exec-summary').textContent = data.summary || '';
-    document.getElementById('imessage-bubble').textContent =
-      `FleetMind Alert [${data.event_id}]\n\n${data.summary || ''}`;
-    document.getElementById('event-id-badge').textContent = data.event_id || '';
-
-    const panel = document.getElementById('results-panel');
-    panel.classList.remove('hidden');
-    panel.classList.add('fade-in');
-  }
-
-  // ---------- Event history ----------
-  function statusBadge(status) {
-    const colors = {
-      processed: '#22c55e',
-      approved: '#3b82f6',
-      needs_review: '#eab308',
-      error: '#ef4444',
-    };
-    const color = colors[status] || '#9ca3af';
-    return `<span class="status-badge" style="background:${color}22; color:${color}; box-shadow:0 0 8px ${color}55">${escapeHtml(status || 'unknown')}</span>`;
-  }
-
-  async function loadEvents() {
-    const tbody = document.getElementById('events-tbody');
-    try {
-      const res = await fetch(`${API_BASE}/events`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const events = await res.json();
-
-      if (!Array.isArray(events) || events.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-gray-500 py-8">No events yet. Trigger FleetMind to get started.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = events.map(e => {
-        const agents = (e.agents_triggered || '')
-          .split(',').map(a => a.trim()).filter(Boolean)
-          .map(a => chip(a, (AGENT_META[a] || {}).color || '#9ca3af'))
-          .join('');
-        const summary = e.summary || e.content || '';
-        return `
-          <tr>
-            <td class="font-mono text-xs text-gray-400">${escapeHtml(e.id)}</td>
-            <td class="text-gray-300">${escapeHtml(e.type || '—')}</td>
-            <td class="text-gray-400">${escapeHtml(e.source || '—')}</td>
-            <td class="text-gray-300 max-w-xs"><div class="line-clamp-2">${escapeHtml(summary).slice(0, 180)}${summary.length > 180 ? '…' : ''}</div></td>
-            <td>${agents || '<span class="text-gray-500 text-xs">—</span>'}</td>
-            <td>${statusBadge(e.status)}</td>
-            <td class="text-xs text-gray-500 whitespace-nowrap">${formatDate(e.created_at)}</td>
-          </tr>`;
-      }).join('');
-    } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-red-400 py-8">Couldn't load events — is the API running at ${API_BASE}?</td></tr>`;
-    }
-  }
-
-  // ---------- Memory bank ----------
-  function memoryCard(agentId, item) {
-    const meta = AGENT_META[agentId];
-    if (!item) {
-      return `
-        <div class="memory-card" style="border-left-color:${meta.color}33">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-semibold" style="color:${meta.color}">${meta.label}</span>
-            <span class="text-[10px] text-gray-500">—</span>
-          </div>
-          <p class="text-xs text-gray-500 italic">No memories yet</p>
-        </div>`;
-    }
-    const content = item.content || item.summary || item.text || JSON.stringify(item);
-    const ts = item.timestamp || item.created_at;
-    return `
-      <div class="memory-card" style="border-left-color:${meta.color}">
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold" style="color:${meta.color}">${meta.label}</span>
-          <span class="text-[10px] text-gray-500">${formatDate(ts)}</span>
-        </div>
-        <p class="text-xs text-gray-400 leading-snug">${escapeHtml(String(content)).slice(0, 180)}</p>
-      </div>`;
-  }
-
-  async function loadMemories() {
-    const container = document.getElementById('memory-bank');
-    const sections = [];
-
-    for (const id of Object.keys(AGENT_META)) {
-      try {
-        const res = await fetch(`${API_BASE}/agents/memory/${id}?query=recent operations`);
-        const data = await res.json();
-        const items = (data.episodes || data.raw_messages || []).filter(Boolean);
-        if (items.length === 0) {
-          sections.push(memoryCard(id, null));
-        } else {
-          items.slice(0, 2).forEach(item => sections.push(memoryCard(id, item)));
-        }
-      } catch (e) {
-        sections.push(memoryCard(id, null));
-      }
-    }
-
-    container.innerHTML = sections.join('');
-  }
-
-  // ---------- Init ----------
-  checkHealth();
-  loadEvents();
-  loadMemories();
+/* ---------- Boot ---------- */
+buildAgents();
+loadConfig(); loadHealth(); loadHistory(); loadMemory();
+connectSSE();
+setInterval(loadHistory, 10000);
+setInterval(loadHealth, 15000);
+setInterval(() => { // refresh "time ago" labels
+  document.querySelectorAll('#liveFeed .feed-item').forEach(el => {
+    const id = el.id.replace('feed-', ''); const ev = seenEvents.get(id);
+    if (ev) { const t = el.querySelector('.feed-time'); if (t) t.textContent = timeAgo(ev.timestamp); }
+  });
+}, 5000);
 </script>
 </body>
 </html>

@@ -5,10 +5,12 @@ from integrations.evermind import memory
 
 AGENT_ID = "finance"
 
-SYSTEM_PROMPT = """You are the Finance agent for FleetMind, a fleet operations \
-orchestrator. You assess the financial impact of incoming events (vendor \
-notices, rate changes, contract amendments, emergencies, etc.) using the \
-company's current contracts and any relevant past finance cases.
+SYSTEM_PROMPT = """You are the Finance agent for FleetMind, an autonomous \
+operations-intelligence system serving ANY industry. You assess the financial \
+impact of any incoming event (vendor price change, supply disruption, contract \
+expiry, outage, regulatory change, emergency, customer issue, etc.) using the \
+organization's current contracts and any relevant past finance cases. If the \
+event has no monetary exposure, say so with impact_amount 0.
 
 Respond with ONLY a JSON object, no prose, no markdown fences, in this exact shape:
 {
@@ -24,7 +26,10 @@ class FinanceAgent:
     agent_id = AGENT_ID
 
     def run(self, task, session_id=None):
-        contracts = client.select("contracts", params={"order": "value.desc", "limit": 50})
+        try:
+            contracts = client.select("contracts", params={"order": "value.desc", "limit": 50})
+        except Exception:
+            contracts = []
         past_memories = memory.search_memory(self.agent_id, task)
 
         user_prompt = (

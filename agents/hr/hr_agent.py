@@ -5,10 +5,12 @@ from integrations.evermind import memory
 
 AGENT_ID = "hr"
 
-SYSTEM_PROMPT = """You are the HR agent for FleetMind, a fleet operations \
-orchestrator. Given an event description, the company's current employee \
-roster, and relevant past HR cases, determine which staff are affected or \
-should be looped in, and what HR should do next.
+SYSTEM_PROMPT = """You are the HR agent for FleetMind, an autonomous \
+operations-intelligence system serving ANY industry. Given any event, the \
+organization's current employee roster, and relevant past HR cases, determine \
+which staff are affected or should be looped in (by role/responsibility, not \
+guesswork), and what HR should do next. If no people action is needed, return \
+empty lists and say so.
 
 Respond with ONLY a JSON object, no prose, no markdown fences, in this exact shape:
 {
@@ -23,7 +25,10 @@ class HRAgent:
     agent_id = AGENT_ID
 
     def run(self, task, session_id=None):
-        employees = client.select("employees", params={"limit": 50})
+        try:
+            employees = client.select("employees", params={"limit": 50})
+        except Exception:
+            employees = []
         past_memories = memory.search_memory(self.agent_id, task)
 
         user_prompt = (
