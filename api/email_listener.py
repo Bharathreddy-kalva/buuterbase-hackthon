@@ -32,11 +32,29 @@ EMAIL_USER = os.environ.get("EMAIL_USER", "")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
 EMAIL_CHECK_INTERVAL = int(os.environ.get("EMAIL_CHECK_INTERVAL", "15"))
 
+# Automated/no-reply senders that should never trigger an agent run, and a
+# minimum body length below which a message is too short to be a real request.
+IGNORED_SENDERS = (
+    "no-reply@google.com",
+    "no-reply@accounts.google.com",
+    "accounts.google.com",
+)
+IGNORED_SENDER_MARKERS = ("no-reply", "noreply")
+MIN_BODY_LENGTH = 50
+
 supervisor = SupervisorAgent()
 
 
 def is_configured() -> bool:
     return bool(EMAIL_USER and EMAIL_PASSWORD)
+
+
+def _is_ignored_sender(sender: str) -> bool:
+    """True for automated/no-reply senders (Google account notices, etc.)."""
+    normalized = sender.lower().strip()
+    if any(blocked in normalized for blocked in IGNORED_SENDERS):
+        return True
+    return any(marker in normalized for marker in IGNORED_SENDER_MARKERS)
 
 
 def _decode(value) -> str:
@@ -148,6 +166,16 @@ async def email_listener_loop() -> None:
         try:
             new_mail = await loop.run_in_executor(None, _fetch_unread)
             for item in new_mail:
+                sender, subject, body = item["sender"], item["subject"], item["body"]
+
+                if _is_ignored_sender(sender):
+                    print(f"🚫 Ignoring automated email from {sender}: {subject}")
+                    continue
+
+                if len(body) < MIN_BODY_LENGTH:
+                    print(f"🚫 Ignoring short email ({len(body)} chars) from {sender}: {subject}")
+                    continue
+
                 await _process_email(item)
         except Exception as exc:
             print(f"⚠️  Email poll error: {exc}")
