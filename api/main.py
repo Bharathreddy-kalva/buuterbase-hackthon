@@ -35,9 +35,7 @@ def health():
     evermind_result = memory.search_memory("supervisor", "health check")
     evermind_status = "disconnected" if "error" in evermind_result else "connected"
 
-    photon_status = (
-        "configured" if imessage.PHOTON_PROJECT_ID and imessage.ALERT_IMESSAGE_NUMBER else "not configured"
-    )
+    photon_status = "configured" if imessage.ALERT_IMESSAGE_NUMBER else "not configured"
 
     return {
         "status": "ok",
